@@ -1,3 +1,4 @@
+from itertools import groupby
 from server.db.session import with_session
 from typing import Dict, List
 import uuid
@@ -5,19 +6,33 @@ from server.db.models.message_model import MessageModel
 
 
 @with_session
-def add_message_to_db(session, conversation_id: str, chat_type, query, response="", message_id=None,
+def add_message_to_db(session, conversation_id: str, chat_type, query, user_id, response="", message_id=None,
                       metadata: Dict = {}):
     """
     新增聊天记录
     """
     if not message_id:
         message_id = uuid.uuid4().hex
-    m = MessageModel(id=message_id, chat_type=chat_type, query=query, response=response,
+    m = MessageModel(id=message_id, user_id=user_id, chat_type=chat_type, query=query, response=response,
                      conversation_id=conversation_id,
                      meta_data=metadata)
     session.add(m)
     session.commit()
     return m.id
+
+@with_session
+def delete_message_from_db(session, conversation_id: str, user_id: str):
+    """
+    新增聊天记录
+    """
+    m = session.query(MessageModel).filter_by(conversation_id=conversation_id, user_id=user_id).all()
+    if m:
+        for i in m:
+            session.delete(i)
+        session.commit()
+        return m[0].conversation_id
+
+    return None
 
 
 @with_session
@@ -44,6 +59,70 @@ def get_message_by_id(session, message_id) -> MessageModel:
     m = session.query(MessageModel).filter_by(id=message_id).first()
     return m
 
+@with_session
+def get_message_by_user_id(session, user_id):
+    """
+    查询聊天记录
+    """
+    m = session.query(MessageModel).filter_by(user_id=user_id).all()
+
+    # 根据m中的conversation_id将m分组
+    m = sorted(m, key=lambda x: x.conversation_id)
+    m = [list(g) for k, g in groupby(m, key=lambda x: x.conversation_id)]
+
+    mm = {
+        "cur_chat_name": "新的对话",
+        "session_key": "chat_history",
+        "user_avatar": "user",
+        "assistant_avatar": "img/chatchat_icon_blue_square_v2.png",
+        "greetings": [],
+        "histories": {
+            historys[0].query + '\n' + str(historys[0].create_time): [({
+                "role": "user",
+                "conversation_id": history.conversation_id,
+                "elements": [
+                    {
+                        "content": history.query,
+                        "output_method": "markdown",
+                        "title": "",
+                        "in_expander": False,
+                        "expanded": False,
+                        "state": "running",
+                        "metadata": {},
+                        "kwargs": {
+                          "unsafe_allow_html": True
+                        }
+                    }
+                ],
+                "metadata": history.meta_data,
+            },
+            {
+                "role": "assistant",
+                "conversation_id": history.conversation_id,
+                "elements": [
+                    {
+                        "content": history.response,
+                        "output_method": "markdown",
+                        "title": "",
+                        "in_expander": False,
+                        "expanded": False,
+                        "state": "running",
+                        "metadata": {},
+                        "kwargs": {
+                          "unsafe_allow_html": True
+                        }
+                    }
+                ],
+                "metadata": history.meta_data,
+            }) for history in historys]
+        for historys in m}
+    }
+
+    # 把{"key": [({}, {}), ({})]}转换为[{"key": [{}, {}, {}]}]
+    for k, v in mm["histories"].items():
+        mm["histories"][k] = [item for sublist in v for item in sublist]
+
+    return mm
 
 @with_session
 def feedback_message_to_db(session, message_id, feedback_score, feedback_reason):

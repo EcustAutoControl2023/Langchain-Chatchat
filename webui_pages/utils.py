@@ -276,6 +276,7 @@ class ApiRequest:
             temperature: float = TEMPERATURE,
             max_tokens: int = None,
             prompt_name: str = "default",
+            user_id: str = None,
             **kwargs,
     ):
         '''
@@ -291,6 +292,7 @@ class ApiRequest:
             "temperature": temperature,
             "max_tokens": max_tokens,
             "prompt_name": prompt_name,
+            "user_id": user_id,
         }
 
         # print(f"received input message:")
@@ -336,6 +338,8 @@ class ApiRequest:
             self,
             query: str,
             knowledge_base_name: str,
+            conversation_id: str,
+            user_id: str,
             top_k: int = VECTOR_SEARCH_TOP_K,
             score_threshold: float = SCORE_THRESHOLD,
             history: List[Dict] = [],
@@ -359,6 +363,8 @@ class ApiRequest:
             "temperature": temperature,
             "max_tokens": max_tokens,
             "prompt_name": prompt_name,
+            "conversation_id": conversation_id,
+            "user_id": user_id,
         }
 
         # print(f"received input message:")

@@ -23,6 +23,10 @@ from urllib.parse import urlencode
 from server.knowledge_base.kb_doc_api import search_docs
 from server.reranker.reranker import LangchainReranker
 from server.utils import embedding_device
+from server.db.repository import add_message_to_db
+from server.callback_handler.AsyncConversationCallbackHandler import KBConversationCallbackHandler as ConversationCallbackHandler
+
+
 async def knowledge_base_chat(query: str = Body(..., description="用户输入", examples=["你好"]),
                               knowledge_base_name: str = Body(..., description="知识库名称", examples=["samples"]),
                               top_k: int = Body(VECTOR_SEARCH_TOP_K, description="匹配向量数"),
@@ -53,8 +57,13 @@ async def knowledge_base_chat(query: str = Body(..., description="用户输入",
                                   description="使用的prompt模板名称(在configs/prompt_config.py中配置)"
                               ),
                               request: Request = None,
+                              user_id: str = Body(..., description="用户id", examples=["123456"]),
+                              conversation_id: str = Body(..., description="会话id", examples=["123456"])
                               ):
     kb = KBServiceFactory.get_service_by_name(knowledge_base_name)
+    # print("query", query)
+    # print("conversation_id", conversation_id)
+    # print("user_id", user_id)
     if kb is None:
         return BaseResponse(code=404, msg=f"未找到知识库 {knowledge_base_name}")
 
@@ -69,14 +78,24 @@ async def knowledge_base_chat(query: str = Body(..., description="用户输入",
     ) -> AsyncIterable[str]:
         nonlocal max_tokens
         callback = AsyncIteratorCallbackHandler()
+        callbacks = [callback]
+
+        # 负责保存llm response到message db
+        message_id = add_message_to_db(chat_type="knowledge_base_chat", query=query, conversation_id=conversation_id, user_id=user_id)
+        conversation_callback = ConversationCallbackHandler(conversation_id=conversation_id, message_id=message_id,
+                                                            chat_type="llm_chat",
+                                                            query=query)
+        callbacks.append(conversation_callback)
+
         if isinstance(max_tokens, int) and max_tokens <= 0:
             max_tokens = None
+
 
         model = get_ChatOpenAI(
             model_name=model_name,
             temperature=temperature,
             max_tokens=max_tokens,
-            callbacks=[callback],
+            callbacks=callbacks,
         )
         docs = await run_in_threadpool(search_docs,
                                        query=query,
@@ -105,6 +124,10 @@ async def knowledge_base_chat(query: str = Body(..., description="用户输入",
             prompt_template = get_prompt_template("knowledge_base_chat", "empty")
         else:
             prompt_template = get_prompt_template("knowledge_base_chat", prompt_name)
+
+        # FIXME: 为了兼容之前的模板，这里需要判断是否有模板
+        if prompt_template is None:
+            prompt_template = get_prompt_template("knowledge_base_chat", "default")
         input_msg = History(role="user", content=prompt_template).to_msg_template(False)
         chat_prompt = ChatPromptTemplate.from_messages(
             [i.to_msg_template() for i in history] + [input_msg])

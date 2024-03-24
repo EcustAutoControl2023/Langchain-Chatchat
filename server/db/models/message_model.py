@@ -9,6 +9,7 @@ class MessageModel(Base):
     """
     __tablename__ = 'message'
     id = Column(String(32), primary_key=True, comment='聊天记录ID')
+    user_id = Column(String(32), default=None, index=True, comment='用户ID')
     conversation_id = Column(String(32), default=None, index=True, comment='对话框ID')
     # chat/agent_chat等
     chat_type = Column(String(50), comment='聊天类型')
@@ -23,3 +24,17 @@ class MessageModel(Base):
 
     def __repr__(self):
         return f"<message(id='{self.id}', conversation_id='{self.conversation_id}', chat_type='{self.chat_type}', query='{self.query}', response='{self.response}',meta_data='{self.meta_data}',feedback_score='{self.feedback_score}',feedback_reason='{self.feedback_reason}', create_time='{self.create_time}')>"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'conversation_id': self.conversation_id,
+            'chat_type': self.chat_type,
+            'query': self.query,
+            'response': self.response,
+            'meta_data': self.meta_data,
+            'feedback_score': self.feedback_score,
+            'feedback_reason': self.feedback_reason,
+            'create_time': self.create_time.strftime('%Y-%m-%d %H:%M:%S')
+        }

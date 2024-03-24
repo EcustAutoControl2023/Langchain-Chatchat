@@ -1,5 +1,7 @@
 import streamlit as st
+from server.db.repository.message_repository import delete_message_from_db
 from webui_pages.utils import *
+from streamlit_option_menu import option_menu
 from streamlit_chatbox import *
 from streamlit_modal import Modal
 from datetime import datetime
@@ -11,8 +13,10 @@ from configs import (TEMPERATURE, HISTORY_LEN, PROMPT_TEMPLATES, LLM_MODELS,
 from server.knowledge_base.utils import LOADER_DICT
 import uuid
 from typing import List, Dict
+import time, re
 
 chat_box = ChatBox(
+    chat_name="新的对话",
     assistant_avatar=os.path.join(
         "img",
         "chatchat_icon_blue_square_v2.png"
@@ -66,12 +70,13 @@ def parse_command(text: str, modal: Modal) -> bool:
             modal.open()
         elif cmd == "new":
             if not name:
-                i = 1
-                while True:
-                    name = f"会话{i}"
-                    if name not in conv_names:
-                        break
-                    i += 1
+                name = "新的对话" + '\n' + str(int(time.time()))
+                # i = 1
+                # while True:
+                #     name = f"会话{i}"
+                #     if name not in conv_names:
+                #         break
+                #     i += 1
             if name in st.session_state["conversation_ids"]:
                 st.error(f"该会话名称 “{name}” 已存在")
                 time.sleep(1)
@@ -79,7 +84,10 @@ def parse_command(text: str, modal: Modal) -> bool:
                 st.session_state["conversation_ids"][name] = uuid.uuid4().hex
                 st.session_state["cur_conv_name"] = name
         elif cmd == "del":
-            name = name or st.session_state.get("cur_conv_name")
+            # print(f'st.session_state["cur_conv_name"]: {st.session_state["cur_conv_name"]}')
+            name = name or st.session_state["cur_conv_name"]
+            # print(f'name: {name}')
+            # print(f'len conv_names: {len(conv_names)}')
             if len(conv_names) == 1:
                 st.error("这是最后一个会话，无法删除")
                 time.sleep(1)
@@ -87,9 +95,11 @@ def parse_command(text: str, modal: Modal) -> bool:
                 st.error(f"无效的会话名称：“{name}”")
                 time.sleep(1)
             else:
+                status = delete_message_from_db(conversation_id=st.session_state["conversation_ids"][name], user_id=st.session_state["user_id"])
+                # print(f'status: {status}')
                 st.session_state["conversation_ids"].pop(name, None)
                 chat_box.del_chat_name(name)
-                st.session_state["cur_conv_name"] = ""
+                st.session_state["cur_conv_name"] = st.session_state["conversation_ids"]
         elif cmd == "clear":
             chat_box.reset_history(name=name or None)
         return True
@@ -97,6 +107,8 @@ def parse_command(text: str, modal: Modal) -> bool:
 
 
 def dialogue_page(api: ApiRequest, is_lite: bool = False):
+    st.title("💬我是损伤失效智能分析系统")
+    st.caption("您好，作为您的智能伙伴，我即能查询设备的失效形式，也能脑洞大开、答疑解惑，现在让我们开始交流吧！<br>您可以在下面的输入框中输入您问题，例如：搜索加氢换热器的失效形式是什么？", unsafe_allow_html=True)
     st.session_state.setdefault("conversation_ids", {})
     st.session_state["conversation_ids"].setdefault(chat_box.cur_chat_name, uuid.uuid4().hex)
     st.session_state.setdefault("file_chat_id", None)
@@ -308,7 +320,8 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
                                   conversation_id=conversation_id,
                                   model=llm_model,
                                   prompt_name=prompt_template_name,
-                                  temperature=temperature)
+                                  temperature=temperature, 
+                                  user_id=st.session_state["user_id"])
                 for t in r:
                     if error_msg := check_error_msg(t):  # check whether error occured
                         st.error(error_msg)
@@ -377,7 +390,9 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
                                                  history=history,
                                                  model=llm_model,
                                                  prompt_name=prompt_template_name,
-                                                 temperature=temperature):
+                                                 temperature=temperature,
+                                                 conversation_id=conversation_id,
+                                                 user_id=st.session_state["user_id"]):
                     if error_msg := check_error_msg(d):  # check whether error occured
                         st.error(error_msg)
                     elif chunk := d.get("answer"):
@@ -452,5 +467,286 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
         "".join(chat_box.export2md()),
         file_name=f"{now:%Y-%m-%d %H.%M}_对话记录.md",
         mime="text/markdown",
+        use_container_width=True,
+    )
+
+def create_new_chat():
+    modal = Modal("自定义命令", key="cmd_help", max_width="500")
+    if parse_command(text="/new", modal=modal):
+        st.session_state["need_rerun"] = True
+
+def load_user_history():
+    '''
+    加载用户历史对话, 从数据库中加载
+    '''
+    print(f'chat_box.cur_chat_name: {chat_box.cur_chat_name}')
+    from server.db.repository import get_message_by_user_id
+    db_messages = get_message_by_user_id(user_id=st.session_state["user_id"])
+    chat_box.from_dict(db_messages)
+    st.session_state.setdefault("conversation_ids", {k: v[0]["conversation_id"] for k,v in db_messages.get("histories", []).items()})
+    st.session_state["conversation_ids"].setdefault("新的对话", uuid.uuid4().hex)
+    st.session_state.setdefault("file_chat_id", None)
+
+
+def dialogue_page_user(api: ApiRequest, is_lite: bool = False):
+    st.title("💬我是损伤失效智能分析系统")
+    st.caption("您好，作为您的智能伙伴，我即能查询设备的失效形式，也能脑洞大开、答疑解惑，现在让我们开始交流吧！<br>您可以在下面的输入框中输入您问题，例如：搜索加氢换热器的失效形式是什么？", unsafe_allow_html=True)
+
+    default_model = api.get_default_llm_model()[0]
+
+    if not chat_box.chat_inited:
+        st.toast(
+            f"欢迎使用 [`Langchain-Chatchat`](https://github.com/chatchat-space/Langchain-Chatchat) ! \n\n"
+            f"当前运行的模型`{default_model}`, 您可以开始提问了."
+        )
+        chat_box.init_session()
+        load_user_history()
+
+    # print(f'st.session_state["conversation_ids"]: {st.session_state["conversation_ids"]}')
+
+    # 弹出自定义命令帮助信息
+    modal = Modal("自定义命令", key="cmd_help", max_width="500")
+    if modal.is_open():
+        with modal.container():
+            cmds = [x for x in parse_command.__doc__.split("\n") if x.strip().startswith("/")]
+            st.write("\n\n".join(cmds))
+
+    with st.sidebar:
+        cols = st.columns(2)
+        session_btn = cols[0]
+        if cols[1].button(
+                "删除对话",
+                use_container_width=True,
+        ):
+            if parse_command(text=f"/del", modal=modal):  # 用户输入自定义命令
+                st.session_state["need_rerun"] = True
+        # 多会话
+        conv_names = list(st.session_state["conversation_ids"].keys())
+        pages = {}
+        for k,v in st.session_state["conversation_ids"].items():
+            pages[k] = {
+                "icon": "chat",
+            }
+        options = list(pages)
+        icons = [x["icon"] for x in pages.values()]
+        index = len(options) - 1
+        # if st.session_state.get("cur_conv_name") in conv_names:
+        #     index = conv_names.index(st.session_state.get("cur_conv_name"))
+        conversation_name = option_menu(
+            "",
+            options=options,
+            icons=icons,
+            default_index=index,
+        )
+        chat_box.use_chat_name(conversation_name)
+        st.session_state["cur_conv_name"] = conversation_name
+
+
+        conversation_id = st.session_state["conversation_ids"][conversation_name]
+        # dialogue_mode = "LLM 对话"
+        dialogue_mode = "文件对话"
+        index_prompt = {
+            "LLM 对话": "llm_chat",
+            "自定义Agent问答": "agent_chat",
+            "搜索引擎问答": "search_engine_chat",
+            "知识库问答": "knowledge_base_chat",
+            "文件对话": "knowledge_base_chat",
+        }
+        prompt_templates_kb_list = list(PROMPT_TEMPLATES[index_prompt[dialogue_mode]].keys())
+        prompt_template_name = prompt_templates_kb_list[0]
+        if "prompt_template_select" not in st.session_state:
+            st.session_state.prompt_template_select = prompt_templates_kb_list[0]
+
+        llm_chat_prompt_template_name = list(PROMPT_TEMPLATES["llm_chat"].keys())[0]
+        knowledge_base_chat_prompt_template_name = list(PROMPT_TEMPLATES["knowledge_base_chat"].keys())[0]
+
+        temperature = TEMPERATURE
+        history_len = HISTORY_LEN
+        running_models = list(api.list_running_models())
+        available_models = []
+        config_models = api.list_config_models()
+        if not is_lite:
+            for k, v in config_models.get("local", {}).items():
+                if (v.get("model_path_exists")
+                        and k not in running_models):
+                    available_models.append(k)
+        for k, v in config_models.get("online", {}).items():
+            if not v.get("provider") and k not in running_models and k in LLM_MODELS:
+                available_models.append(k)
+        llm_models = running_models + available_models
+        cur_llm_model = st.session_state.get("cur_llm_model", default_model)
+        if cur_llm_model in llm_models:
+            index = llm_models.index(cur_llm_model)
+        else:
+            index = 0
+        llm_model = llm_models[index]
+
+    # Display chat messages from history on app rerun
+    chat_box.output_messages()
+
+    chat_input_placeholder = "请输入对话内容，换行请使用Shift+Enter。输入/help查看自定义命令 "
+
+    def on_feedback(
+            feedback,
+            message_id: str = "",
+            history_index: int = -1,
+    ):
+        reason = feedback["text"]
+        score_int = chat_box.set_feedback(feedback=feedback, history_index=history_index)
+        api.chat_feedback(message_id=message_id,
+                          score=score_int,
+                          reason=reason)
+        st.session_state["need_rerun"] = True
+
+    feedback_kwargs = {
+        "feedback_type": "thumbs",
+        "optional_text_label": "欢迎反馈您打分的理由",
+    }
+
+    def reset_chat_name():
+        # print(f'history_len: {len(chat_box.history)}')
+        # print("reset_chat_name")
+        pattern = r"[^\w\.-]"
+        new_conversation_name = re.sub(pattern, "", st.session_state["prompt"]) + "\n" + str(int(time.time()))
+        # print(f'cur_chat_name: {chat_box.cur_chat_name}')
+        # print(f'new_conversation_name: {new_conversation_name}')
+        chat_box.rename_chat_name(chat_box.cur_chat_name, new_conversation_name)
+        st.session_state["conversation_ids"].update({new_conversation_name:st.session_state["conversation_ids"].pop(st.session_state["cur_conv_name"])})
+        st.session_state["cur_conv_name"] = new_conversation_name
+        st.session_state["need_rerun"] = True
+
+    if prompt := st.chat_input(chat_input_placeholder, key="prompt"):
+        if parse_command(text=prompt, modal=modal):  # 用户输入自定义命令
+            st.rerun()
+        else:
+            history = get_messages_history(history_len)
+            chat_box.user_say(prompt)
+            if dialogue_mode == "LLM 对话":
+                chat_box.ai_say("正在思考...")
+                text = ""
+                message_id = ""
+                r = api.chat_chat(prompt,
+                                  history=history,
+                                  conversation_id=conversation_id,
+                                  model=llm_model,
+                                  prompt_name=prompt_template_name,
+                                  temperature=temperature, 
+                                  user_id=st.session_state["user_id"])
+                for t in r:
+                    if error_msg := check_error_msg(t):  # check whether error occured
+                        st.error(error_msg)
+                        break
+                    text += t.get("text", "")
+                    chat_box.update_msg(text)
+                    message_id = t.get("message_id", "")
+
+                metadata = {
+                    "message_id": message_id,
+                }
+                chat_box.update_msg(text, streaming=False, metadata=metadata)  # 更新最终的字符串，去除光标
+                chat_box.show_feedback(**feedback_kwargs,
+                                       key=message_id,
+                                       on_submit=on_feedback,
+                                       kwargs={"message_id": message_id, "history_index": len(chat_box.history) - 1})
+            elif dialogue_mode == "知识库问答":
+                chat_box.ai_say([
+                    f"正在查询知识库 `{selected_kb}` ...",
+                    Markdown("...", in_expander=True, title="知识库匹配结果", state="complete"),
+                ])
+                text = ""
+                for d in api.knowledge_base_chat(prompt,
+                                                 knowledge_base_name=DEFAULT_KNOWLEDGE_BASE,
+                                                 top_k=VECTOR_SEARCH_TOP_K,
+                                                 score_threshold=SCORE_THRESHOLD,
+                                                 history=history,
+                                                 model=llm_model,
+                                                 prompt_name=prompt_template_name,
+                                                 temperature=temperature,
+                                                 conversation_id=conversation_id,
+                                                 user_id=st.session_state["user_id"]):
+                    if error_msg := check_error_msg(d):  # check whether error occured
+                        st.error(error_msg)
+                    elif chunk := d.get("answer"):
+                        text += chunk
+                        chat_box.update_msg(text, element_index=0)
+                chat_box.update_msg(text, element_index=0, streaming=False)
+                chat_box.update_msg("\n\n".join(d.get("docs", [])), element_index=1, streaming=False)
+            elif dialogue_mode == "文件对话":
+                chat_box.ai_say([
+                    f"正在查询知识库 `{DEFAULT_KNOWLEDGE_BASE}` ...",
+                    Markdown("...", in_expander=True, title="知识库匹配结果", state="complete"),
+                    Markdown("正在思考...", in_expander=True, title="大模型自身能力回答", state="complete"),
+                ])
+                text = ""
+                for d in api.knowledge_base_chat(prompt,
+                                                 knowledge_base_name=DEFAULT_KNOWLEDGE_BASE,
+                                                 top_k=VECTOR_SEARCH_TOP_K,
+                                                 score_threshold=SCORE_THRESHOLD,
+                                                 history=history,
+                                                 model=llm_model,
+                                                 prompt_name=knowledge_base_chat_prompt_template_name,
+                                                 temperature=temperature,
+                                                 conversation_id=conversation_id,
+                                                 user_id=st.session_state["user_id"]):
+                    if error_msg := check_error_msg(d):  # check whether error occured
+                        st.error(error_msg)
+                    elif chunk := d.get("answer"):
+                        text += chunk
+                        chat_box.update_msg(text, element_index=0)
+                chat_box.update_msg(text, element_index=0, streaming=False)
+                chat_box.update_msg("\n\n".join(d.get("docs", [])), element_index=1, streaming=False)
+                text = ""
+                message_id = ""
+                r = api.chat_chat(prompt,
+                                  history=history,
+                                  conversation_id=conversation_id,
+                                  model=llm_model,
+                                  prompt_name=llm_chat_prompt_template_name,
+                                  temperature=temperature, 
+                                  user_id=st.session_state["user_id"])
+                for t in r:
+                    if error_msg := check_error_msg(t):  # check whether error occured
+                        st.error(error_msg)
+                        break
+                    text += t.get("text", "")
+                    chat_box.update_msg(text)
+                    message_id = t.get("message_id", "")
+
+                chat_box.update_msg(text, element_index=2, streaming=False)  # 更新最终的字符串，去除光标
+
+                # 如果是新的对话，重置对话名称
+                # print(f'chat_box.history: {len(chat_box.history)}')
+                if len(chat_box.history) == 2:
+                    reset_chat_name()
+
+    if st.session_state.get("need_rerun"):
+        st.session_state["need_rerun"] = False
+        st.rerun()
+
+    now = datetime.now()
+    with st.sidebar:
+
+        cols = st.columns(2)
+        export_btn = cols[0]
+        if cols[1].button(
+                "清空对话",
+                use_container_width=True,
+        ):
+            chat_box.reset_history()
+            st.rerun()
+
+    export_btn.download_button(
+        "导出记录",
+        "".join(chat_box.export2md()),
+        file_name=f"{now:%Y-%m-%d %H.%M}_对话记录.md",
+        mime="text/markdown",
+        # chat_box.to_json(),
+        # file_name="chat_history.json",
+        # mime="text/json",
+        use_container_width=True,
+    )
+    session_btn.button(
+        "新建对话",
+        on_click=create_new_chat,
         use_container_width=True,
     )
