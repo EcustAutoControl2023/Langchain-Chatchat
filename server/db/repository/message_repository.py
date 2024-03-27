@@ -2,7 +2,9 @@ from itertools import groupby
 from server.db.session import with_session
 from typing import Dict, List
 import uuid
+import datetime
 from server.db.models.message_model import MessageModel
+
 
 
 @with_session
@@ -77,7 +79,9 @@ def get_message_by_user_id(session, user_id):
         "assistant_avatar": "img/chatchat_icon_blue_square_v2.png",
         "greetings": [],
         "histories": {
-            historys[0].query + '\n' + str(historys[0].create_time): [({
+            # historys[0].query + '\n' + str(historys[0].create_time ): [({
+            # 加8小时
+            historys[0].query + '\n' + str(historys[0].create_time + datetime.timedelta(hours=8)): [({
                 "role": "user",
                 "conversation_id": history.conversation_id,
                 "elements": [

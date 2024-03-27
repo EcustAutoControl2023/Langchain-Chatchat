@@ -4,7 +4,7 @@ from webui_pages.utils import *
 from streamlit_option_menu import option_menu
 from streamlit_chatbox import *
 from streamlit_modal import Modal
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import re
 import time
@@ -483,7 +483,7 @@ def load_user_history():
     from server.db.repository import get_message_by_user_id
     db_messages = get_message_by_user_id(user_id=st.session_state["user_id"])
     chat_box.from_dict(db_messages)
-    st.session_state.setdefault("conversation_ids", {k: v[0]["conversation_id"] for k,v in db_messages.get("histories", []).items()})
+    st.session_state.setdefault("conversation_ids", {k: v[0]["conversation_id"] for k,v in reversed(db_messages.get("histories", []).items())})
     st.session_state["conversation_ids"].setdefault("新的对话", uuid.uuid4().hex)
     st.session_state.setdefault("file_chat_id", None)
 
@@ -607,7 +607,7 @@ def dialogue_page_user(api: ApiRequest, is_lite: bool = False):
         # print(f'history_len: {len(chat_box.history)}')
         # print("reset_chat_name")
         pattern = r"[^\w\.-]"
-        new_conversation_name = re.sub(pattern, "", st.session_state["prompt"]) + "\n" + str(int(time.time()))
+        new_conversation_name = re.sub(pattern, "", st.session_state["prompt"]) + "\n" + datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         # print(f'cur_chat_name: {chat_box.cur_chat_name}')
         # print(f'new_conversation_name: {new_conversation_name}')
         chat_box.rename_chat_name(chat_box.cur_chat_name, new_conversation_name)
