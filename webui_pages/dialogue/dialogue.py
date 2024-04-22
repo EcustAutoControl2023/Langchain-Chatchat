@@ -108,7 +108,7 @@ def parse_command(text: str, modal: Modal) -> bool:
 
 def dialogue_page(api: ApiRequest, is_lite: bool = False):
     st.title("💬我是损伤失效智能分析系统")
-    st.caption("您好，作为您的智能伙伴，我即能查询设备的失效形式，也能脑洞大开、答疑解惑，现在让我们开始交流吧！<br>您可以在下面的输入框中输入您问题，例如：搜索加氢换热器的失效形式是什么？", unsafe_allow_html=True)
+    st.caption("您好，作为您的智能伙伴，我即能查询设备的失效形式，也能脑洞大开、答疑解惑，现在让我们开始交流吧！<br>您可以在下面的输入框中输入您问题，例如：加氢换热器的失效形式是什么？", unsafe_allow_html=True)
     st.session_state.setdefault("conversation_ids", {})
     st.session_state["conversation_ids"].setdefault(chat_box.cur_chat_name, uuid.uuid4().hex)
     st.session_state.setdefault("file_chat_id", None)
@@ -490,7 +490,7 @@ def load_user_history():
 
 def dialogue_page_user(api: ApiRequest, is_lite: bool = False):
     st.title("💬我是损伤失效智能分析系统")
-    st.caption("您好，作为您的智能伙伴，我即能查询设备的失效形式，也能脑洞大开、答疑解惑，现在让我们开始交流吧！<br>您可以在下面的输入框中输入您问题，例如：搜索加氢换热器的失效形式是什么？", unsafe_allow_html=True)
+    st.caption("您好，作为您的智能伙伴，我即能查询设备的失效形式，也能脑洞大开、答疑解惑，现在让我们开始交流吧！<br>您可以在下面的输入框中输入您问题，例如：加氢换热器的失效形式是什么？", unsafe_allow_html=True)
 
     default_model = api.get_default_llm_model()[0]
 
@@ -651,7 +651,7 @@ def dialogue_page_user(api: ApiRequest, is_lite: bool = False):
             elif dialogue_mode == "知识库问答":
                 chat_box.ai_say([
                     f"正在查询知识库 `{selected_kb}` ...",
-                    Markdown("...", in_expander=True, title="知识库匹配结果", state="complete"),
+                    # Markdown("...", in_expander=True, title="知识库匹配结果", state="complete"),
                 ])
                 text = ""
                 for d in api.knowledge_base_chat(prompt,
@@ -674,8 +674,8 @@ def dialogue_page_user(api: ApiRequest, is_lite: bool = False):
             elif dialogue_mode == "文件对话":
                 chat_box.ai_say([
                     f"正在查询知识库 `{DEFAULT_KNOWLEDGE_BASE}` ...",
-                    Markdown("...", in_expander=True, title="知识库匹配结果", state="complete"),
-                    Markdown("正在思考...", in_expander=True, title="大模型自身能力回答", state="complete"),
+                    # Markdown("...", in_expander=True, title="知识库匹配结果", state="complete"),
+                    # Markdown("正在思考...", in_expander=True, title="大模型自身能力回答", state="complete"),
                 ])
                 text = ""
                 for d in api.knowledge_base_chat(prompt,
@@ -694,25 +694,25 @@ def dialogue_page_user(api: ApiRequest, is_lite: bool = False):
                         text += chunk
                         chat_box.update_msg(text, element_index=0)
                 chat_box.update_msg(text, element_index=0, streaming=False)
-                chat_box.update_msg("\n\n".join(d.get("docs", [])), element_index=1, streaming=False)
-                text = ""
-                message_id = ""
-                r = api.chat_chat(prompt,
-                                  history=history,
-                                  conversation_id=conversation_id,
-                                  model=llm_model,
-                                  prompt_name=llm_chat_prompt_template_name,
-                                  temperature=temperature, 
-                                  user_id=st.session_state["user_id"])
-                for t in r:
-                    if error_msg := check_error_msg(t):  # check whether error occured
-                        st.error(error_msg)
-                        break
-                    text += t.get("text", "")
-                    chat_box.update_msg(text)
-                    message_id = t.get("message_id", "")
-
-                chat_box.update_msg(text, element_index=2, streaming=False)  # 更新最终的字符串，去除光标
+                # chat_box.update_msg("\n\n".join(d.get("docs", [])), element_index=1, streaming=False)
+                # text = ""
+                # message_id = ""
+                # r = api.chat_chat(prompt,
+                #                   history=history,
+                #                   conversation_id=conversation_id,
+                #                   model=llm_model,
+                #                   prompt_name=llm_chat_prompt_template_name,
+                #                   temperature=temperature, 
+                #                   user_id=st.session_state["user_id"])
+                # for t in r:
+                #     if error_msg := check_error_msg(t):  # check whether error occured
+                #         st.error(error_msg)
+                #         break
+                #     text += t.get("text", "")
+                #     chat_box.update_msg(text)
+                #     message_id = t.get("message_id", "")
+                #
+                # chat_box.update_msg(text, element_index=2, streaming=False)  # 更新最终的字符串，去除光标
 
                 # 如果是新的对话，重置对话名称
                 # print(f'chat_box.history: {len(chat_box.history)}')

@@ -9,8 +9,83 @@ import sys
 from configs import VERSION
 from server.utils import api_address
 
+st.set_page_config( "损伤失效智能分析系统", os.path.join("img", "chatchat_icon_blue_square_v2.png"), initial_sidebar_state="expanded", menu_items={ 'Get Help': 'https://github.com/chatchat-space/Langchain-Chatchat', 'Report a bug': "https://github.com/chatchat-space/Langchain-Chatchat/issues", 'About': f"""欢迎使用 Langchain-Chatchat WebUI {VERSION}！""" })
+
 # TODO: 登陆实现
 from streamlit_login_auth_ui.widgets import __login__
+
+def nav_sidebar(self):
+    """
+    Creates the side navigaton bar
+    """
+    main_page_sidebar = st.sidebar.empty()
+    with main_page_sidebar:
+        selected_option = option_menu(
+            menu_title = '损伤失效智能分析系统',
+            # menu_icon = 'list-columns-reverse',
+            icons = ['box-arrow-in-right', 'person-plus', 'x-circle','arrow-counterclockwise'],
+            # options = ['Login', 'Create Account', 'Forgot Password?', 'Reset Password'],
+            options = ['登录', '创建账户', '忘记密码', '重置密码'],
+            styles = {
+                "container": {"padding": "5px"},
+                "nav-link": {"font-size": "14px", "text-align": "left", "margin":"0px"}} )
+    return main_page_sidebar, selected_option
+
+def build_login_ui(self):
+    """
+    Brings everything together, calls important functions.
+    """
+    if 'LOGGED_IN' not in st.session_state:
+        st.session_state['LOGGED_IN'] = False
+
+    if 'LOGOUT_BUTTON_HIT' not in st.session_state:
+        st.session_state['LOGOUT_BUTTON_HIT'] = False
+
+    auth_json_exists_bool = self.check_auth_json_file_exists('_secret_auth_.json')
+
+    if auth_json_exists_bool == False:
+        with open("_secret_auth_.json", "w") as auth_json:
+            json.dump([], auth_json)
+
+    main_page_sidebar, selected_option = self.nav_sidebar()
+
+    # if selected_option == 'Login':
+    if selected_option == '登录':
+        c1, c2 = st.columns([7,3])
+        with c1:
+            self.login_widget()
+        with c2:
+            if st.session_state['LOGGED_IN'] == False:
+                self.animation()
+    
+    # if selected_option == 'Create Account':
+    if selected_option == '创建账户':
+        self.sign_up_widget()
+
+    # if selected_option == 'Forgot Password?':
+    if selected_option == '忘记密码':
+        self.forgot_password()
+
+    # if selected_option == 'Reset Password':
+    if selected_option == '重置密码':
+        self.reset_password()
+    
+    self.logout_widget()
+
+    if st.session_state['LOGGED_IN'] == True:
+        main_page_sidebar.empty()
+    
+    if self.hide_menu_bool == True:
+        self.hide_menu()
+    
+    if self.hide_footer_bool == True:
+        self.hide_footer()
+    
+    return st.session_state['LOGGED_IN']
+
+__login__.nav_sidebar = nav_sidebar
+__login__.build_login_ui = build_login_ui
+
 __login__obj = __login__(auth_token = "courier_auth_token", 
                     company_name = "Shims",
                     width = 200, height = 250, 
@@ -51,7 +126,6 @@ def start_page(api: ApiRequest,is_lite):
     st.image(image_path, caption='Your Image Caption', use_column_width=True)
 
 
-# st.set_page_config( "Langchain-Chatchat WebUI", os.path.join("img", "chatchat_icon_blue_square_v2.png"), initial_sidebar_state="expanded", menu_items={ 'Get Help': 'https://github.com/chatchat-space/Langchain-Chatchat', 'Report a bug': "https://github.com/chatchat-space/Langchain-Chatchat/issues", 'About': f"""欢迎使用 Langchain-Chatchat WebUI {VERSION}！""" })
 
 if __name__ == "__main__":
     is_lite = "lite" in sys.argv
