@@ -108,7 +108,7 @@ def parse_command(text: str, modal: Modal) -> bool:
 
 def dialogue_page(api: ApiRequest, is_lite: bool = False):
     st.title("💬我是损伤失效智能分析系统")
-    st.caption("您好，作为您的智能伙伴，我即能查询设备的失效形式，也能脑洞大开、答疑解惑，现在让我们开始交流吧！<br>您可以在下面的输入框中输入您问题，例如：加氢换热器的失效形式是什么？", unsafe_allow_html=True)
+    st.caption("您好，作为您的智能伙伴，我既能查询设备的失效形式，也能脑洞大开、答疑解惑，现在让我们开始交流吧！<br>您可以在下面的输入框中输入您问题，例如：加氢换热器的失效形式是什么？", unsafe_allow_html=True)
     st.session_state.setdefault("conversation_ids", {})
     st.session_state["conversation_ids"].setdefault(chat_box.cur_chat_name, uuid.uuid4().hex)
     st.session_state.setdefault("file_chat_id", None)
@@ -490,7 +490,7 @@ def load_user_history():
 
 def dialogue_page_user(api: ApiRequest, is_lite: bool = False):
     st.title("💬我是损伤失效智能分析系统")
-    st.caption("您好，作为您的智能伙伴，我即能查询设备的失效形式，也能脑洞大开、答疑解惑，现在让我们开始交流吧！<br>您可以在下面的输入框中输入您问题，例如：加氢换热器的失效形式是什么？", unsafe_allow_html=True)
+    st.caption("您好，作为您的智能伙伴，我既能查询设备的失效形式，也能脑洞大开、答疑解惑，现在让我们开始交流吧！<br>您可以在下面的输入框中输入您问题，例如：加氢换热器的失效形式是什么？", unsafe_allow_html=True)
 
     default_model = api.get_default_llm_model()[0]
 

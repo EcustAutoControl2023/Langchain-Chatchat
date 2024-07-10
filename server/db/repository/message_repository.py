@@ -71,6 +71,7 @@ def get_message_by_user_id(session, user_id):
     # 根据m中的conversation_id将m分组
     m = sorted(m, key=lambda x: x.conversation_id)
     m = [list(g) for k, g in groupby(m, key=lambda x: x.conversation_id)]
+    m = sorted(m, key=lambda x: x[0].create_time, reverse=True)
 
     mm = {
         "cur_chat_name": "新的对话",

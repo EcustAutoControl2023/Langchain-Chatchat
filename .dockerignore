@@ -1,10 +1,9 @@
 .idea
 .git/
-# Langchain-Chatchat
 docs
 .github
 tests
-Dockerfile
+dockerfile
 .dockerignore
 .gitignore
 .gitmodules
@@ -15,6 +14,3 @@ LICENSE
 requirements_api.txt
 requirements_lite.txt
 requirements_webui.txt
-# bge-large-zh-v1.5
-bge-large-zh-v1.5/README.md
-# chatglm3-6b
