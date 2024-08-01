@@ -48,6 +48,7 @@ class SupportedVSType:
     PG = 'pg'
     ES = 'es'
     CHROMADB = 'chromadb'
+    FAISSRAG = 'faissrag'
 
 
 class KBService(ABC):
@@ -114,7 +115,8 @@ class KBService(ABC):
             for doc in docs:
                 doc.metadata.setdefault("source", kb_file.filename)
         else:
-            docs = kb_file.file2text()
+            # docs = kb_file.file2text()
+            docs = kb_file.abstract2text()
             custom_docs = False
 
         if docs:
@@ -319,6 +321,9 @@ class KBServiceFactory:
         if SupportedVSType.FAISS == vector_store_type:
             from server.knowledge_base.kb_service.faiss_kb_service import FaissKBService
             return FaissKBService(kb_name, embed_model=embed_model)
+        if SupportedVSType.FAISSRAG == vector_store_type:
+            from server.knowledge_base.kb_service.faissrag_kb_service import FaissRagKBService
+            return FaissRagKBService(kb_name, embed_model=embed_model)
         elif SupportedVSType.PG == vector_store_type:
             from server.knowledge_base.kb_service.pg_kb_service import PGKBService
             return PGKBService(kb_name, embed_model=embed_model)

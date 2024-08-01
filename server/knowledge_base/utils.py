@@ -347,6 +347,32 @@ class KnowledgeFile:
                                                 text_splitter=text_splitter)
         return self.splited_docs
 
+    # TODO: 读取分割好的摘要文件
+    def abstract2text(
+            self,
+            zh_title_enhance: bool = ZH_TITLE_ENHANCE,
+            refresh: bool = False,
+            chunk_size: int = CHUNK_SIZE,
+            chunk_overlap: int = OVERLAP_SIZE,
+            text_splitter: TextSplitter = None,
+        ):
+        with open(self.filepath, encoding='utf-8') as f:
+            lines = f.readlines()
+        data = [json.loads(line.strip()) for line in lines]
+        metadatas = [{"resource": d.get('resource')} for d in data]
+        texts = [d.get('abstract_response') for d in data]
+        # texts = [d.get('resource') for d in data]
+        ids = [d.get('id') for d in data]
+
+        _metadatas = metadatas or [{}] * len(texts)
+        documents = []
+        for id, text, metadata in zip(ids, texts, _metadatas):
+            metadata['id'] = id
+            metadata['source'] = self.filename
+            new_doc = Document(page_content=text, metadata=metadata)
+            documents.append(new_doc)
+        return documents
+
     def file_exist(self):
         return os.path.isfile(self.filepath)
 
@@ -371,7 +397,8 @@ def files2docs_in_thread(
 
     def file2docs(*, file: KnowledgeFile, **kwargs) -> Tuple[bool, Tuple[str, str, List[Document]]]:
         try:
-            return True, (file.kb_name, file.filename, file.file2text(**kwargs))
+            # return True, (file.kb_name, file.filename, file.file2text(**kwargs))
+            return True, (file.kb_name, file.filename, file.abstract2text(**kwargs))
         except Exception as e:
             msg = f"从文件 {file.kb_name}/{file.filename} 加载文档时出错：{e}"
             logger.error(f'{e.__class__.__name__}: {msg}',
